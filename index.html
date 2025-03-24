@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pong con Manos</title>
+    <script src="handsfree.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: black; }
+        #gameCanvas { display: block; }
+        #handsfree-debug {
+            position: absolute !important;
+            top: 10px !important;
+            left: 10px !important;
+            width: 200px !important;
+            height: 150px !important;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let paddleHeight = 200;
+let paddleWidth = 20;
+let ballSize = 15;
+
+// Configuración inicial
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Posiciones iniciales
+let leftPaddleY = (canvas.height - paddleHeight) / 2;
+let rightPaddleY = (canvas.height - paddleHeight) / 2;
+let ballX = canvas.width / 2;
+let ballY = canvas.height / 2;
+let ballSpeedX = 10;
+let ballSpeedY = 20;
+let scoreLeft = 0;
+let scoreRight = 0;
+
+// Configurar handsfree.js
+const handsfree = new Handsfree({
+    hands: {
+        enabled: true,
+        maxNumHands: 2,
+        minDetectionConfidence: 0.5, 
+        minTrackingConfidence: 0.5   
+    },
+    showDebug: true
+});
+
+handsfree.start();
+
+// Función principal del juego
+function gameLoop() {
+    // Limpiar canvas
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Actualizar posiciones de las palas
+    if (handsfree.data?.hands) {
+        const hands = handsfree.data.hands;
+        if (hands.multiHandLandmarks) {
+            // Control pala izquierda con mano izquierda
+            const leftHand = hands.multiHandLandmarks[0];
+            if (leftHand) {
+                leftPaddleY = (leftHand[8].y * canvas.height) - paddleHeight/2;
+                drawHand(leftHand, 'blue');
+            }
+
+            // Control pala derecha con mano derecha
+            const rightHand = hands.multiHandLandmarks[1];
+            if (rightHand) {
+                rightPaddleY = (rightHand[8].y * canvas.height) - paddleHeight/2;
+                drawHand(rightHand, 'red');
+            }
+        }
+    }
+
+    // Limitar movimiento de las palas
+    leftPaddleY = Math.max(0, Math.min(canvas.height - paddleHeight, leftPaddleY));
+    rightPaddleY = Math.max(0, Math.min(canvas.height - paddleHeight, rightPaddleY));
+
+    // Dibujar elementos
+    ctx.fillStyle = 'white';
+    // Palas
+    ctx.fillRect(0, leftPaddleY, paddleWidth, paddleHeight);
+    ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, paddleHeight);
+    // Pelota
+    ctx.beginPath();
+    ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Mover pelota
+    ballX += ballSpeedX;
+    ballY += ballSpeedY;
+
+    // Colisiones con bordes
+    if (ballY + ballSize > canvas.height || ballY - ballSize < 0) {
+        ballSpeedY = -ballSpeedY;
+    }
+
+    // Colisiones con palas
+    if (
+        (ballX - ballSize < paddleWidth && 
+         ballY > leftPaddleY && 
+         ballY < leftPaddleY + paddleHeight) ||
+        (ballX + ballSize > canvas.width - paddleWidth && 
+         ballY > rightPaddleY && 
+         ballY < rightPaddleY + paddleHeight)
+    ) {
+        ballSpeedX = -ballSpeedX;
+    }
+
+    // Puntuación
+    if (ballX < 0) {
+        scoreRight++;
+        resetBall();
+    } else if (ballX > canvas.width) {
+        scoreLeft++;
+        resetBall();
+    }
+
+    // Mostrar puntuación
+    ctx.font = '48px Arial';
+    ctx.fillText(scoreLeft, canvas.width/4, 50);
+    ctx.fillText(scoreRight, 3*canvas.width/4, 50);
+
+    requestAnimationFrame(gameLoop);
+}
+
+function resetBall() {
+    ballX = canvas.width / 2;
+    ballY = canvas.height / 2;
+    ballSpeedX = -ballSpeedX;
+    ballSpeedY = Math.random() * 10 - 5;
+}
+
+function drawHand(hand, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+
+    for (let i = 0; i < hand.length; i++) {
+        const point = hand[i];
+        ctx.beginPath();
+        ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    // Conectar puntos de la mano
+    const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],  // Pulgar
+        [0, 5], [5, 6], [6, 7], [7, 8],  // Índice
+        [0, 9], [9, 10], [10, 11], [11, 12],  // Medio
+        [0, 13], [13, 14], [14, 15], [15, 16],  // Anular
+        [0, 17], [17, 18], [18, 19], [19, 20]  // Meñique
+    ];
+
+    for (const [start, end] of connections) {
+        ctx.beginPath();
+        ctx.moveTo(hand[start].x * canvas.width, hand[start].y * canvas.height);
+        ctx.lineTo(hand[end].x * canvas.width, hand[end].y * canvas.height);
+        ctx.stroke();
+    }
+}
+
+// Iniciar juego
+gameLoop();
+
+// Ajustar tamaño del canvas cuando se redimensiona la ventana
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+</script>
+</body>
+</html>
+
