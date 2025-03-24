@@ -1,17 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pong con Manos</title>
+    <title>Handsfree Pong</title>
     <script src="handsfree.js"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: black;
-        }
-
-        #gameCanvas {
-            display: block;
         }
 
         #handsfree-debug {
@@ -34,6 +30,14 @@
     let paddleWidth = 20;
     let ballSize = 15;
 
+    // Sound effects
+    const paddleSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3');
+    const wallSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2853/2853-preview.mp3');
+
+    // Set volume levels
+    wallSound.volume = 0.3;
+    paddleSound.volume = 0.3;
+
     // Configuración inicial
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -48,17 +52,18 @@
     let scoreLeft = 0;
     let scoreRight = 0;
 
+    //contador inicial
+    let incremental_speed = 0.2;
+
     // Configurar handsfree.js
     const handsfree = new Handsfree({
-        assetsPath: 'assets',
-
         hands: {
             enabled: true,
             maxNumHands: 2,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         },
-        showDebug: true
+        showDebug: false
     });
 
     handsfree.start();
@@ -76,15 +81,13 @@
                 // Control pala izquierda con mano izquierda
                 const leftHand = hands.multiHandLandmarks[0];
                 if (leftHand) {
-                    leftPaddleY = (leftHand[8].y * canvas.height) - paddleHeight / 2;
-                    drawHand(leftHand, 'blue');
+                    rightPaddleY = (leftHand[8].y * canvas.height) - paddleHeight / 2;
                 }
 
                 // Control pala derecha con mano derecha
                 const rightHand = hands.multiHandLandmarks[1];
                 if (rightHand) {
-                    rightPaddleY = (rightHand[8].y * canvas.height) - paddleHeight / 2;
-                    drawHand(rightHand, 'red');
+                    leftPaddleY = (rightHand[8].y * canvas.height) - paddleHeight / 2;
                 }
             }
         }
@@ -110,6 +113,8 @@
         // Colisiones con bordes
         if (ballY + ballSize > canvas.height || ballY - ballSize < 0) {
             ballSpeedY = -ballSpeedY;
+            wallSound.currentTime = 0;
+            wallSound.play();
         }
 
         // Colisiones con palas
@@ -122,6 +127,17 @@
                 ballY < rightPaddleY + paddleHeight)
         ) {
             ballSpeedX = -ballSpeedX;
+
+            if (ballSpeedX >= 0) {
+                ballSpeedX += incremental_speed
+            } else {
+                ballSpeedX -= incremental_speed
+            }
+
+
+            paddleSound.currentTime = 0;
+            paddleSound.play();
+            paddleSound.playbackRate = Math.random() * 0.5 + 0.75;
         }
 
         // Puntuación
